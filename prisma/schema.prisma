@@ -1,0 +1,209 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum PatientType {
+  STUDENT
+  FACULTY
+  STAFF
+  null
+}
+
+model User {
+  id                   String              @id @default(cuid())
+  name                 String
+  email                String              @unique
+  password             String?
+  role                 UserRole
+  patientType          PatientType?
+  accounts             Account[]
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  PasswordResetToken   PasswordResetToken? @relation(fields: [passwordResetTokenId], references: [id])
+  passwordResetTokenId String?
+
+  patient Patient?
+  doctor  Doctor?
+}
+
+model Doctor {
+  id                 String               @id @default(cuid())
+  userId             String               @unique
+  user               User                 @relation(fields: [userId], references: [id])
+  specialization     String?
+  DoctorAvailability DoctorAvailability[]
+  Appointment        Appointment[]
+}
+
+model DoctorAvailability {
+  id        String   @id @default(cuid())
+  doctorId  String
+  doctor    Doctor   @relation(fields: [doctorId], references: [id])
+  startTime DateTime
+  endTime   DateTime
+  weekday   String
+}
+
+model Patient {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  dob        DateTime?
+  gender     String?   @db.Char(225)
+  phone      String?   @db.VarChar(225)
+  bloodGroup String?   @db.VarChar(225)
+  address    String?   @db.Text
+
+  studentInfo          StudentInfo?
+  facultyInfo          FacultyInfo?
+  staffInfo            StaffInfo?
+  Appointment          Appointment[]
+  ReimbursementRequest ReimbursementRequest[]
+
+  @@unique([userId])
+}
+
+model ReimbursementRequest {
+  id                 String      @id @default(cuid())
+  patientId          String
+  appointmentId      String
+  amount             Float
+  billImgUrl         String
+  referralImgUrl     String?
+  prescriptionImgUrl String?
+  status             String      @default("PENDING")
+  submittedAt        DateTime    @default(now())
+  Patient            Patient     @relation(fields: [patientId], references: [id])
+  Appointment        Appointment @relation(fields: [appointmentId], references: [id])
+}
+
+model Appointment {
+  id                   String                 @id @default(cuid())
+  doctorId             String
+  doctor               Doctor                 @relation(fields: [doctorId], references: [id])
+  patientId            String
+  patient              Patient                @relation(fields: [patientId], references: [id])
+  time                 DateTime
+  weekday              String
+  reason               String?
+  status               String                 @default("PENDING")
+  Prescription         Prescription[]
+  ReimbursementRequest ReimbursementRequest[]
+}
+
+model StudentInfo {
+  id              String  @id @default(cuid())
+  patientId       String  @unique
+  patient         Patient @relation(fields: [patientId], references: [id])
+  currentSemester String?
+  department      String? @db.VarChar(225)
+  program         String? @db.VarChar(225)
+  originCountry   String? @db.VarChar(225)
+}
+
+model FacultyInfo {
+  id         String    @id @default(cuid())
+  patientId  String    @unique
+  patient    Patient   @relation(fields: [patientId], references: [id])
+  department String?   @db.VarChar(225)
+  position   String?   @db.VarChar(225)
+  hireDate   DateTime?
+}
+
+model StaffInfo {
+  id         String    @id @default(cuid())
+  patientId  String    @unique
+  patient    Patient   @relation(fields: [patientId], references: [id])
+  department String?   @db.VarChar(225)
+  position   String?   @db.VarChar(225)
+  hireDate   DateTime?
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userId    String?
+  User      User[]
+
+  @@unique([email, token])
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Test {
+  id             String           @id @default(cuid())
+  testName       String           @unique
+  details        String?
+  PrescribedTest PrescribedTest[]
+}
+
+model Medicine {
+  id                 String               @id @default(cuid())
+  medicineName       String               @unique
+  manufacturer       String?
+  description        String?
+  PrescribedMedicine PrescribedMedicine[]
+}
+
+model Prescription {
+  id                  String               @id @default(cuid())
+  appointmentId       String
+  appointment         Appointment          @relation(fields: [appointmentId], references: [id])
+  diagnosis           String
+  treatment           String
+  notes               String?
+  prescribedMedicines PrescribedMedicine[]
+  prescribedTests     PrescribedTest[]
+}
+
+model PrescribedMedicine {
+  id              String       @id @default(cuid())
+  prescription    Prescription @relation(fields: [prescriptionId], references: [id])
+  prescriptionId  String
+  medicine        Medicine     @relation(fields: [medicineId], references: [id])
+  medicineId      String
+  doseAmount      String
+  frequencyPerDay String
+  durationInDays  String
+}
+
+model PrescribedTest {
+  id             String       @id @default(cuid())
+  prescriptionId String
+  prescription   Prescription @relation(fields: [prescriptionId], references: [id])
+  testId         String
+  test           Test         @relation(fields: [testId], references: [id])
+}
